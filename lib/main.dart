@@ -1,161 +1,136 @@
-import 'package:flutter/material.dart';
-import 'package:sqflite/sqflite.dart';
+import 'dart:async';
+import 'package:flutter/widgets.dart';
 import 'package:path/path.dart';
+import 'package:sqflite/sqflite.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // เปิดฐานข้อมูลและสร้างตาราง AnimalTreatment
+  // เปิดฐานข้อมูลและสร้างตาราง Hamster
   final database = openDatabase(
-    join(await getDatabasesPath(), 'animal_treatment.db'),
+    join(await getDatabasesPath(), 'hamster_database.db'),
     onCreate: (db, version) {
-      return db.execute('''
-        CREATE TABLE treatments(
-          id INTEGER PRIMARY KEY AUTOINCREMENT,
-          animalName TEXT,
-          species TEXT,
-          age INTEGER,
-          symptoms TEXT,
-          treatment TEXT,
-          doctor TEXT,
-          date TEXT
-        )
-        ''');
+      return db.execute(
+        'CREATE TABLE hamsters(id INTEGER PRIMARY KEY, name TEXT, breed TEXT, age INTEGER, color TEXT, weight REAL, vaccinated INTEGER)',
+      );
     },
     version: 1,
   );
 
-  // ฟังก์ชันเพิ่มข้อมูลการรักษา
-  Future<void> insertTreatment(AnimalTreatment treatment) async {
+  // ฟังก์ชันเพิ่มแฮมสเตอร์
+  Future<void> insertHamster(Hamster hamster) async {
     final db = await database;
     await db.insert(
-      'treatments',
-      treatment.toMap(),
+      'hamsters',
+      hamster.toMap(),
       conflictAlgorithm: ConflictAlgorithm.replace,
     );
   }
 
-  // ฟังก์ชันดึงข้อมูลการรักษาทั้งหมด
-  Future<List<AnimalTreatment>> treatments() async {
+  // ฟังก์ชันดึงรายชื่อแฮมสเตอร์ทั้งหมด
+  Future<List<Hamster>> hamsters() async {
     final db = await database;
-    final List<Map<String, Object?>> maps = await db.query('treatments');
-    return maps.map((m) => AnimalTreatment.fromMap(m)).toList();
+    final List<Map<String, Object?>> hamsterMaps = await db.query('hamsters');
+    return [
+      for (final {'id': id, 'name': name, 'breed': breed, 'age': age, 'color': color, 'weight': weight, 'vaccinated': vaccinated} in hamsterMaps)
+        Hamster(
+          id: id as int,
+          name: name as String,
+          breed: breed as String,
+          age: age as int,
+          color: color as String,
+          weight: (weight as num).toDouble(),
+          vaccinated: (vaccinated as int) == 1,
+        ),
+    ];
   }
 
-  // ฟังก์ชันอัปเดตข้อมูลการรักษา
-  Future<void> updateTreatment(AnimalTreatment treatment) async {
+  // ฟังก์ชันอัปเดตแฮมสเตอร์
+  Future<void> updateHamster(Hamster hamster) async {
     final db = await database;
     await db.update(
-      'treatments',
-      treatment.toMap(),
+      'hamsters',
+      hamster.toMap(),
       where: 'id = ?',
-      whereArgs: [treatment.id],
+      whereArgs: [hamster.id],
     );
   }
 
-  // ฟังก์ชันลบข้อมูลการรักษา
-  Future<void> deleteTreatment(int id) async {
+  // ฟังก์ชันลบแฮมสเตอร์
+  Future<void> deleteHamster(int id) async {
     final db = await database;
-    await db.delete('treatments', where: 'id = ?', whereArgs: [id]);
+    await db.delete(
+      'hamsters',
+      where: 'id = ?',
+      whereArgs: [id],
+    );
   }
 
-  // -------------------------
-  // ทดสอบการทำงาน
-  // -------------------------
-
-  // เพิ่มข้อมูลใหม่
-  var record = AnimalTreatment(
-    animalName: 'Lucky',
-    species: 'Dog',
-    age: 5,
-    symptoms: 'ไข้, ซึม',
-    treatment: 'ฉีดยาลดไข้ + ให้น้ำเกลือ',
-    doctor: 'น.สพ. สมชาย',
-    date: '2025-09-03',
+  // สร้างแฮมสเตอร์ตัวอย่าง
+  var hammy = Hamster(
+    id: 0,
+    name: 'Hammy',
+    breed: 'Syrian',
+    age: 1,
+    color: 'Golden',
+    weight: 0.12,
+    vaccinated: true,
   );
-  await insertTreatment(record);
 
-  // แสดงข้อมูลทั้งหมด
-  print("📋 หลังจาก insert:");
-  print(await treatments());
+  await insertHamster(hammy);
+  print(await hamsters());
 
-  // อัปเดตข้อมูล
-  var allRecords = await treatments();
-  var firstRecord = allRecords.first;
-  var updatedRecord = AnimalTreatment(
-    id: firstRecord.id,
-    animalName: firstRecord.animalName,
-    species: firstRecord.species,
-    age: firstRecord.age,
-    symptoms: firstRecord.symptoms,
-    treatment: 'เปลี่ยนเป็นให้ยาปฏิชีวนะ + ให้น้ำเกลือ',
-    doctor: firstRecord.doctor,
-    date: firstRecord.date,
+  // อัปเดตอายุแฮมสเตอร์
+  hammy = Hamster(
+    id: hammy.id,
+    name: hammy.name,
+    breed: hammy.breed,
+    age: hammy.age + 1,
+    color: hammy.color,
+    weight: hammy.weight,
+    vaccinated: hammy.vaccinated,
   );
-  await updateTreatment(updatedRecord);
+  await updateHamster(hammy);
+  print(await hamsters());
 
-  print("✏️ หลังจาก update:");
-  print(await treatments());
-
-  // ลบข้อมูล
-  await deleteTreatment(updatedRecord.id!);
-
-  print("🗑 หลังจาก delete:");
-  print(await treatments());
+  // ลบแฮมสเตอร์
+  await deleteHamster(hammy.id);
+  print(await hamsters());
 }
 
-// -------------------------
-// คลาสเก็บข้อมูลการรักษา
-// -------------------------
-class AnimalTreatment {
-  final int? id; // ใช้ nullable เพราะ SQLite จะ generate ให้เอง
-  final String animalName;
-  final String species;
+class Hamster {
+  final int id;
+  final String name;
+  final String breed;
   final int age;
-  final String symptoms;
-  final String treatment;
-  final String doctor;
-  final String date;
+  final String color;
+  final double weight;
+  final bool vaccinated;
 
-  AnimalTreatment({
-    this.id,
-    required this.animalName,
-    required this.species,
+  Hamster({
+    required this.id,
+    required this.name,
+    required this.breed,
     required this.age,
-    required this.symptoms,
-    required this.treatment,
-    required this.doctor,
-    required this.date,
+    required this.color,
+    required this.weight,
+    required this.vaccinated,
   });
 
   Map<String, Object?> toMap() {
     return {
       'id': id,
-      'animalName': animalName,
-      'species': species,
+      'name': name,
+      'breed': breed,
       'age': age,
-      'symptoms': symptoms,
-      'treatment': treatment,
-      'doctor': doctor,
-      'date': date,
+      'color': color,
+      'weight': weight,
+      'vaccinated': vaccinated ? 1 : 0,
     };
-  }
-
-  factory AnimalTreatment.fromMap(Map<String, Object?> map) {
-    return AnimalTreatment(
-      id: map['id'] as int?,
-      animalName: map['animalName'] as String,
-      species: map['species'] as String,
-      age: map['age'] as int,
-      symptoms: map['symptoms'] as String,
-      treatment: map['treatment'] as String,
-      doctor: map['doctor'] as String,
-      date: map['date'] as String,
-    );
   }
 
   @override
   String toString() {
-    return 'Treatment{id: $id, animalName: $animalName, species: $species, age: $age, symptoms: $symptoms, treatment: $treatment, doctor: $doctor, date: $date}';
+    return 'Hamster{id: $id, name: $name, breed: $breed, age: $age, color: $color, weight: $weight, vaccinated: $vaccinated}';
   }
 }
